@@ -1,0 +1,21 @@
+Dim 3
+Nx 21
+Ny 21
+Nz 225
+delt 0.005
+integrator all GJF
+rand_seed 1634600229
+max_steps 2000001
+log_freq 5000
+threads 512
+grid_freq 0
+traj_freq 0
+binary_freq 25000
+struc_freq 0
+skip_steps 20000
+pmeorder 1
+charges 0.43484 1
+diffusivity 1 1
+n_gaussians 1
+gaussian1 1 0.0003688 1
+bond 1 harmonic 1.5 0

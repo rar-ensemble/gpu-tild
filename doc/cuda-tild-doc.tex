@@ -1,0 +1,620 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx, latexsym, wrapfig, setspace, times, amsmath, amssymb, color }
+\usepackage[left=1in, top=1in, right=1in, nohead, paperwidth=8.5in, paperheight=11in, textheight=9in]{geometry} 
+%\bibliographystyle{nature}
+\bibliographystyle{ieeetr}
+\usepackage{pdfpages}
+\usepackage[normalem]{ulem}
+
+\usepackage[tiny,compact]{titlesec}
+\titlespacing{\section}{0pt}{*0}{*0}
+\titlespacing{\subsection}{0pt}{*0}{*0}
+\titlespacing{\subsubsection}{0pt}{*0}{*0}
+\newcommand{\mb}{\mathbf}
+\newcommand{\mc}{\mathcal}
+\newcommand{\eps}{\varepsilon}
+
+\definecolor{orange}{RGB}{255,127,0}
+\definecolor{maroon}{RGB}{135,38,87}
+\definecolor{navy}{RGB}{0,0,128}
+\setlength{\parskip}{8pt}
+\setlength{\parindent}{0pt}
+
+%\doublespace
+
+
+
+\pagestyle{empty}
+
+
+%%%%%%%%%%%
+%%%%%%%%%%%
+%%%%%%%%%%%
+\begin{document}
+
+\begin{center}
+	{\bf \LARGE NEEDS-A-NAME Code Documentation}
+\end{center}
+
+This is a rough documentation of the CUDA-TILD code as it develops.
+
+In V0.9, the code seems capable of handling the standard Gaussian chain polymer models. The input file is more flexible than other codes I have written, and the potentials use a class-based structure that should make extending the code more straightforward.
+
+As of 3 May 2020, the only quantitative testing has been in 2D, so more testing needs to be done, particularly to make sure the magnitudes of $\chi$ work out as expected.
+
+
+\section{Interaction Potentials}
+
+
+
+\subsection{Gaussians}
+
+A standard Gaussian governs the non-bonded interactions,
+\begin{eqnarray}
+u(r) &=& \frac{A}{(2\pi \sigma^2)^{D/2}} \; \exp(-r^2/2\sigma^2)
+\\
+&=&
+A \, u_G(r)
+\label{eq:gauss}
+\end{eqnarray}
+where $A$ and $\sigma$ are the amplitude and standard deviation of the Gaussian potential and $u_G$ is a normalized Gaussian distribution in $D$ dimensions. Entering the potential parameters in the input file is of the form
+\begin{verbatim}
+gaussian Itype Jtype A sigma
+\end{verbatim}
+to calculate a potential energy of the form
+\begin{eqnarray}
+U
+&=&
+A
+\int d\mb r
+\int d\mb r'
+\;
+\rho_I(\mb r)
+\,
+u_G(|\mb r - \mb r'|)
+\,
+\rho_J(\mb r').
+\end{eqnarray}
+
+\subsubsection{ Relation to other field theory forms}
+
+Koski et al. [JCP 2013] and Villet and Fredrickson [JCP 2014] have shown the relationship between the ``smearing functions'' commonly used to regularize field-theoretic simulations (FTS) and non-bonded potentials, $u(r) = A (h_I \ast h_J)(r)$, where the $\ast$ indicates a convolution, and $h_I(r)$ and $h_J(r)$ are the normalized smearing functions for species $I$ and $J$. Smearing with a unit Gaussian is commonly used in FTS, which leads to an effective potential in Fourier space 
+\begin{eqnarray}
+\tilde u(k) &=& A \tilde h_I(k) \tilde h_J(k)
+\\
+\nonumber
+&=& A \, e^{-k^2 a_I^2/2} \, e^{-k^2 a_J^2/2}
+\\
+\nonumber
+&=& A \, e^{-k^2 (a_I^2+a_J^2)/2}.
+\end{eqnarray}
+Or, in real space, the potential can be related to the smearing functions
+\begin{eqnarray}
+u(r) &=& \frac{A}{(2\pi (a_I^2+a_J^2))^{D/2}} \, e^{-r^2/2(a_I^2+a_J^2)}
+\end{eqnarray}
+
+\subsubsection{ Gaussian-Regularized Model A implementation}
+
+To implement a Gaussian regularized Edwards model (Model A from ETIP), the effective potential should simply be 
+\begin{eqnarray}
+	u(r) = \frac{u_0}{2} \; u_G(r)
+\end{eqnarray}
+and so treating $A = u_0/2$ in Eq.~\ref{eq:gauss} gives the standard Model A.
+
+
+\subsubsection{Compressible Blend (Model D)}
+
+The blend requires two components $A$ and $B$, and for this section I'll assume the range of the Gaussian potential ($\sigma$) on all components is identical. Model D has the total interaction energy
+\begin{eqnarray}
+	U
+	&=&
+	\frac{\kappa}{2\rho_0}
+	\int d \mb r
+	\int d \mb r'
+	\,
+	[\rho_+(\mb r)-\rho_0] \, 
+	u_G(|\mb r- \mb r'|)
+	\,
+	[\rho_+(\mb r')-\rho_0]
+	\\
+	\nonumber
+	&&
+	+
+	\frac{ \chi } { \rho_0 }
+	\int d\mb r
+	\int d\mb r'
+	\,
+	\rho_A(\mb r)
+	\,
+	u_G(|\mb r - \mb r'|)
+	\,
+	\rho_B(\mb r'),
+\end{eqnarray}
+where $\rho_+ = \rho_A + \rho_B$. Writing out $\rho_+$ and collecting terms that are quadratic in the spatially-varying density, we arrive at the form typically used in TILD,
+\begin{eqnarray}
+	U &=&
+	\frac{\kappa + \chi}{\rho_0} 
+	\int d\mb r
+	\int d\mb r'
+	\,
+	\rho_A(\mb r)
+	\,
+	u_G(|\mb r - \mb r'|)
+	\,
+	\rho_B(\mb r')
+	\\
+	&&
+	\nonumber
+	+
+	\frac{\kappa}{2\rho_0} 
+	\int d\mb r
+	\int d\mb r'
+	\,
+	\rho_A(\mb r)
+	\,
+	u_G(|\mb r - \mb r'|)
+	\,
+	\rho_A(\mb r')
+	\\
+	&&
+	\nonumber
+	+
+	\frac{\kappa}{2\rho_0} 
+	\int d\mb r
+	\int d\mb r'
+	\,
+	\rho_B(\mb r)
+	\,
+	u_G(|\mb r - \mb r'|)
+	\,
+	\rho_B(\mb r')
+	+ u_{irr},
+\end{eqnarray} 
+where $u_{irr}$ are terms that are either constant or linear in the densities and thus have no thermodynamic relevance other than a shift in the energy scale. Thus, using two distinct prefactors in Eq.~\ref{eq:gauss} $A_{II} = \kappa/2\rho_0$ and $A_{IJ} = (\kappa + \chi)/\rho_0$, we find
+\begin{eqnarray}
+  \kappa &=& 2 \rho_0 A_{II}
+  \\
+  \chi &=& \rho_0 (A_{IJ} - 2 A_{II}).
+\end{eqnarray}
+
+{\it Example inputs}
+
+Binary mixture with a finite $\chi$:
+\begin{verbatim}
+n_gaussians 3
+gaussian 1 1  2.5  0.5
+gaussian 2 2  2.5  0.5
+gaussian 1 2  10.0 0.5
+\end{verbatim}
+Two-component system that begins with $\chi = 0$ in the above equations, then ramps $\chi$ to larger values linearly over the simulation to a finite value:
+\begin{verbatim}
+n_gaussians 3
+gaussian 1 1 10.0  0.5
+gaussian 1 2 20.0 0.5 ramp 20.4
+gaussian 2 2 10.0  0.5
+\end{verbatim}
+
+
+
+
+
+\subsection{Erf Potential}
+\label{sec:erf}
+
+
+This potential is used to generate smooth spheres within the simulation. The potential is defined as real-space as 
+
+\begin{eqnarray}
+	u(r) &= A \text{erfc}
+	\left(
+		\frac{\vert \mathbf{r} \vert - R_p}{\sigma}
+	\right)
+\end{eqnarray}
+where $A$ is the amplitude, $R_p$ is the radius of the nanoparticles, $\sigma$ controls the width of the nanoparticle. 
+Entering the potential parameters in the input file is of the form 
+\begin{verbatim}
+	erf Itype JType A Rp sigma ramp A_final
+\end{verbatim}
+with \verb+ramp+ and \verb+A_final+ are optional parameters similar to the Gaussian parameters. 
+
+The potential in this case is the convolution between two spheres and thus should not be used between point particles and spheres (which is what ``\verb+gaussian_erf+below is for).
+
+The function is defined in kspace since the ``erfc'' function is the convolution between a Gaussian function and a box function. The kspace potential used is 
+\begin{equation}
+	U(k) = A \, u_G(k) \,\left( \frac{4\pi (\sin(R_p k) - R_p k \cos(R_p k) )}{k^3}\right)^2
+\end{equation}
+
+
+To use the potential here 
+\subsection{Gaussian-erfc cross potential}
+To model the interactions between the polymer and the spheres themselves, we use a modified version of the potential called \verb+gaussian_erf+.
+\begin{equation}
+	U(k) = A \, u_G(k) \, \frac{4\pi (\sin(R_p k) - R_p k \cos(R_p k) )}{k^3}
+\end{equation}
+
+
+
+
+
+
+\subsection{Phase Fields}
+\label{sec:fieldphase}
+
+This potential is a static field that allows biasing into particular phases. The form of the pair style is
+\begin{eqnarray}
+	U = \int d\mb r
+	\;
+	[\rho_I(\mb r) - \rho_J(\mb r)] 
+	\, A_o \, w(\mb r),
+\end{eqnarray}
+where $w(\mb r)$ takes values in $\pm 1$ and has the symmetry of a desired phase. For example, one version might have $w(\mb r) = \sin(2\pi x/L_x)$, a sine wave to induce a single period of a lamellar structure in the $x$-direction. The ultimate amplitude is governed by $A_o$. One could imagine using such a field to initialize a system, then switching to the Gaussian potentials above to properly equilibrate and test the stability of a phase. While it won't guarantee going into the equilibrium phase, it should enable the formation of defect-free structures.
+
+This potential also includes \verb+ramp+ arguments like those of Gaussian and Erf.
+
+NOTE: This should be used in conjunction with some kind of self-repulsion (e.g., a Gaussian potential between $I-I$ and $J-J$) to prevent large total density fluctuations.
+
+
+
+
+
+
+\pagebreak
+\section{Input Commands}
+
+\subsection{Current input commands}
+
+\begin{itemize}
+  \item
+    -in [file\_name]
+    \\[8pt]
+	Changes the input script from default \verb+input+. Is used in the command line argument not in the input script.
+
+  \item
+    Dim [integer] 
+    \\[8pt]
+    Sets the dimensionality of the system.
+
+  \item
+    Nx [integer]
+    \\
+    Ny [integer]
+    \\
+    Nz [integer]
+    \\[8pt]
+    Sets the grid points in the x-, y-, and z-directions
+
+
+  \item
+    read$\_$data [string]
+    \\[8pt]
+    Name of the input configuration file, should be in roughly LAMMPS data file format.
+
+  \item
+    read$\_$resume [string]
+    \\[8pt]
+    Name of the resume file, assumed to be a lammpstrj frame format.
+
+    
+    
+    \item
+    binary$\_$freq [integer]
+    \\[8pt]
+    Frequency for writing to the binary data files
+        
+    \item
+    charges [float] [float]
+    \\[8pt]
+    Indicates to read in a charge configuration (follows LAMMPS ``charges'' format). The first float is the Bjerrum length for electrostatic interactions, the second is the smearing length for the charges (assumed Gaussian distributions).
+    
+    
+    \item 
+    compute [style] [arguments]
+    \\[8pt]
+    Enable compute for on-the-fly computations. Currently enabled styles:
+    \\[8pt]
+    avg\_sk [integer type] [optional arguments]
+    \\[8pt] 
+    Optional arguments are: ``wait [integer number of time steps]'' and  ``freq [integer number of time steps]''
+    \\[8pt]
+    This compute calculates a running average of the static structure factor on the fly based on the density field of the indicated species type. The ``wait'' option delays the calculation for some number of time steps (default = 0), and the ``freq'' option sets the frequency of performing the compute (default = 100 time steps).
+    
+    
+    \item
+    delt [float]
+    \\[8pt]
+    Size of the time step
+    
+    
+    \item
+    diffusivity [int A] [float D]
+    \\[8pt]
+    Sets diffusivity of beads of type A. Only used with GJF integrator
+    
+    
+    \item
+    grid$\_$freq [integer]
+    \\[8pt]
+    Frequency of writing the grid data to a human-readable text file. Use sparingly.
+    
+	\item
+	group [string name] [string style] [style options...]
+	\\[8pt]
+	Define a group with a given name (first string) defined according to the style. Currently only supports ``type'' based groups, which are defined with style ``type'' and should be followed by a single integer to define the atom type in the group.
+
+  
+  	\item
+    integrator [string]
+    \\[8pt]
+    Integration scheme to employ; current options are EM (Euler-Maruyama) or GJF (Gr{\o}nbech-Jensen and Farago)
+
+
+	\item
+	log$\_$freq [integer]
+	\\[8pt]
+	Frequency of writing to data.dat file. Requires host-device communication.
+	
+	
+	
+	\item
+	max$\_$steps [integer]
+	\\[8pt]
+	Total number of time steps
+    
+    
+    \item
+    rand$\_$seed [integer]
+    \\[8pt]
+    seed for the random number generator
+    
+    
+  \item
+    threads [integer]
+    \\[8pt]
+    Number of threads per GPU block to employ. Default is 512.
+    
+    
+    
+
+  \item
+    traj$\_$freq =[integer]
+    \\[8pt]
+    Frequency for writing to lammpstrj text file. Use sparingly.
+
+  \item
+    pmeorder [integer]
+    \\[8pt]
+    Should be an integer 1, 2, 3, or 4. Determines the order of the spline used to map particle densities to the grid.
+
+  \item
+    bond [integer bond type] [float prefactor] [float equilibrium bond separation]
+    \\[8pt]
+    Parameters for the harmonic bond of the form $u(r_{ij}) = k (r_{ij}-r_0)^2$.
+    
+  \item
+    n\_gaussians [integer]
+    \\[8pt]
+    Number of Gaussian non-bonded interaction pairs, $n_G$. This line {\bf must} be immediately followed by $n_G$ lines of the form:
+    \\[8pt]
+    gaussian [integer type 1] [integer type 2] [float prefactor] [float std deviation]
+    \\[8pt]
+    This defines a non-bonded interaction between particles of type 1 and 2 of the form 
+    \\
+	$u_G(r_{ij}) = \frac{A}{(2\pi \sigma^2)^{\mathbb D/2} }\, e^{-|r_{ij}|^2/2\sigma^2}$
+
+	Employs the \verb+ramp+ keyword.
+	
+  \item
+    n\_erfs [integer $n_\text{erf}$]
+    \\[8pt]
+    Number of Erf non-bonded interaction pairs, $n_\text{erf}$. This line {\bf must} be immediately followed by $n_\text{erf}$ lines of the form:
+    \\[8pt]
+    gaussian [integer type 1] [integer type 2] [float prefactor] [float std deviation]
+    \\[8pt]
+    This defines a non-bonded interaction between particles of type 1 and 2 of the form 
+    \\
+	$u(r) = A  \,\, erf\left(\frac{\vert\mathbf{r}\vert - R_p}{\sigma}\right) * erf\left(\frac{\vert\mathbf{r}\vert - R_p}{\sigma}\right)$
+
+	Employs the \verb+ramp+ keyword
+	
+  \item
+    n\_gaussian\_erfs [integer $n_\text{G-erf}$]
+    \\[8pt]
+    Number of Gaussian-erf cross potential interaction pairs, $n_\text{G-erf}$. This line {\bf must} be immediately followed by $n_\text{G-erf}$ lines of the form:
+    \\[8pt]
+    gaussian [integer type 1] [integer type 2] [float prefactor] [float std deviation]
+    \\[8pt]
+    This defines a non-bonded interaction between particles of type 1 and 2 of the form 
+    \\
+    $u(r) = A \frac{1}{(2\pi \sigma^2)^{\mathbb D/2} }\, e^{-|r|^2/2\sigma^2}* erf\left(\frac{\vert\mathbf{r}\vert - R_p}{\sigma}\right)$
+
+	Employs the \verb+ramp+ keyword
+	
+  \item
+    n\_fieldphases [integer $n_f$]
+    \\[8pt]
+    Number of external applied fields with which the particles should interact, see section \ref{sec:fieldphase} above. This line {\bf must} be immediately followed by $n_f$ lines of the form:
+    \\[8pt]
+    fieldphase [int type 1] [int type 2] [float prefactor] [int phase] [int dir] [int n periods]
+    \\[8pt]
+    For the phase: 0 = Lamellar, 1 = BCC (NOT YET IMPLEMENTED), 2 = CYL, 3 = GYR. Direction is the direction normal to lamellae, along the cylinders, and is ignore for GYR and BCC.
+
+	Employs the \verb+ramp+ keyword
+\end{itemize}
+		%	else if (word == "n_gaussians") {
+     % else if (word == "n_fieldphase") {
+
+\subsection{Creating new input commands}
+
+In addition to the variables that need to be defined, there are three places in read\_input.cu that must be modified to create new commands read in ``read\_input()''. 
+
+1. Any default values need to be set in the set\_defaults subroutine.
+
+2. The code to parse the relevant line has to be in the main part of read input.
+
+3. The right parts need to be added to write\_runtime\_parameters routine.
+
+
+
+
+
+
+
+
+\pagebreak
+\section{Creating a new potential}
+
+\begin{enumerate}
+	\item
+	Assuming a normal pairstyle, one begins by creating a subclass of PairStyle with the desired name. The first real piece of code to write is the functional form of the potential and getting that on the device. After calling the subroutine \verb+Initialize+ which calls +Initialize\_Potential+ (or whatever it gets named), the variables d\_u, d\_f, d\_u\_k, and d\_f\_k should all be defined. Both the real and Fourier space components are needed for convenient debugging (d\_u) and required for proper setup of the virial (d\_f). Calculations of the force and energy each use the Fourier-space versions.
+	
+	The initialize routine you write should begin with a call to the inherited function \verb+Initialize\_PairStyle()+ and end with a call to \verb+Initialize\_Virial()+;
+	
+	pair\_style\_gaussian.cu and .h are good examples to follow.
+	
+	\item
+	Implement the input file reading and writing, including writing the runtime parameters in read\_input.cu. This generally requires defining a \verb+std::vector+ of your new class. The parameters of your pairstyle should be associated with either the \verb+PairStyle+ class or your new class, depending on how applicable it is for other potentials. 
+	
+	\item
+	Implement the energy and virial calls in calc\_properties.cu. Edits should be made to the subroutines calc\_nbVirial, calc\_nbEnergy.
+	
+	Separately, the forces should be called in forces.cu.
+	
+	\item
+	In main.cu, add the new potential's energy values to the output streams.
+	
+	\item
+	Test that it is behaving as expected.
+	
+\end{enumerate}
+
+
+
+
+\pagebreak
+\section{Utilities}
+
+In the directory ``utils'', there are several .cpp files that can be used to post-process or generate initial configurations. 
+
+\subsection{utils/gen-configs}
+The configuration generation utilities are not well maintained and could stand to be made into python and more uniform, but for now:
+\\
+random\_config.cpp must be edited in source and can be used to generate configurations of diblocks.
+
+random\_blend.cpp must be edited in source and can generate binary blends.
+
+diblock\_solvent.cpp must be edited in source, can create an AB diblock + a C solvent. 
+
+
+\subsection{utils/post-proc}
+dump\_grid\_densities.cpp converts the given frames into .tec files for view in ParaView.
+
+avg-grid-densities.cpp does not appear to actualy average as promised...
+
+calc\_sk/ subdirectory. Uses FFTW to calculate $S(k)$ from the binary files.
+
+dump\_particle\_posits.cpp is supposed to dump the binary particle positions into a lammpstrj file.
+
+
+
+
+
+
+
+
+
+\pagebreak
+\section{To-Do List}
+In no particular order of priority or difficulty.
+
+\begin{enumerate}
+	
+	
+	\item
+	Angle potentials. 	
+
+	\item
+	LC interactions via Maier-Saupe potential
+	
+	\item
+	Rigid body dynamics, requires figuring out quaternions...
+	
+	\item
+	Constant $NV\gamma T$ ensemble to find domain spacing for L, C phases
+	
+	\item
+	DPD integrator
+		
+	\item
+	Create bond/polymerization functionality
+	
+	\item
+	Other bonded potentials (e.g., FENE) potentials.
+	
+	
+\end{enumerate}
+
+
+
+{\bf Completed To-Do items:}
+\begin{enumerate}
+	
+	\item
+	Implement charges, which will require reading a new input format. This will necessitate an atom style flag of some sort.
+	
+	\item
+	\sout{GJF Algorithm, requires allocating and storing old positions, noise for each particle.}
+	
+	\item
+	\sout{Calculate energies on the device, not the host. Will require figuring out how to do a reduction on the device.}
+	\\
+	{\it Attempted this using the routine in ``CUDA reduction example.pdf'', values didn't match..}
+	\\
+	While this doesn't work on the device, it seems to be of negligible expense to do on the host. Ccalcuating reductions on host is not as terrible as it seemed? Is of negligible expense for the bonds anyway, which are a large loop over number of particles.
+	
+	\item
+	\sout{Implement pressure calculations.}
+	\\
+	Finished, seems to agree well with mean-field
+	
+	
+	\item
+	\sout{Binary output files and utilities to convert to text format}
+	\\
+	Done, \sout{though particle conversion utility still bugged..}
+	
+	\item
+	\sout{Ability to gradually ramp parameters (e.g., $\chi$ becomes time dependent)}
+	\\
+	Done
+	
+	\item
+	\sout{Resume functionality}
+	\\
+	Takes a lammpstrj frame as a resume file
+
+	\item
+	\sout{Smooth, bare spherical nanoparticles}
+	\\
+	Done
+	
+\item
+\sout{Be able to replace cross-interactions with a static field to seed different microstructures. Keep particle-based self interactions a la $\kappa$ potential, but cross-interactions are replaced with a static field that has the shape needed. Will need to figure out the basis functions required to make this work...}
+\\
+Implemented, except for sphere phases
+
+	\item
+	\sout{Calculate $S(k)$ for a given species (maybe force this as a post-proc step)}
+	\\
+	Implemented as post-processing
+	
+\end{enumerate}
+
+\section{Scaling and Performance}
+
+More data needed, with figures.
+
+Current version ran $nN = 175k$ particles on a $45^3$ grid to 250k iterations in 25 minutes on my laptop, which runs an 8 GB NVIDIA GTX 1070. 10\% of that time was spent communicating with the host and calculating the energy on the host, so there is still yet room for improvement.
+
+Second calculation ran a system with 648k particles on a $63^3$ grid at a density of 3.0 for 250k steps in 89 minutes.
+
+\end{document}
