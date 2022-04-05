@@ -126,6 +126,50 @@ void send_box_params_to_device() {
 	free(h_bond_stuff);
 
 
+    
+    
+    // Send angle info to device if needed
+    if ( n_total_angles > 0 ) {
+        cudaMemcpy(d_angle_k, angle_k, nangle_types * sizeof(float), 
+            cudaMemcpyHostToDevice);
+        cudaMemcpy(d_angle_theta_eq, angle_theta_eq, nangle_types * sizeof(float), 
+            cudaMemcpyHostToDevice);
+
+        cudaMemcpy(d_n_angles, n_angles, ns * sizeof(int),
+            cudaMemcpyHostToDevice);
+            
+
+        int* h_ang;
+        h_ang = (int*)calloc(ns * MAX_ANGLES, sizeof(int));
+
+        for ( int i=0 ; i<ns ; i++ )
+            for ( int j=0 ; j<MAX_ANGLES; j++ )
+                h_ang[i * MAX_ANGLES + j] = angle_type[i][j];
+        cudaMemcpy(d_angle_type, h_ang, ns*MAX_ANGLES * sizeof(int),
+            cudaMemcpyHostToDevice);
+       
+        for ( int i=0 ; i<ns ; i++ )
+            for ( int j=0 ; j<MAX_ANGLES; j++ )
+                h_ang[i * MAX_ANGLES + j] = angle_first[i][j];
+        cudaMemcpy(d_angle_first, h_ang, ns*MAX_ANGLES * sizeof(int),
+            cudaMemcpyHostToDevice);
+
+        for ( int i=0 ; i<ns ; i++ )
+            for ( int j=0 ; j<MAX_ANGLES; j++ )
+                h_ang[i * MAX_ANGLES + j] = angle_mid[i][j];
+        cudaMemcpy(d_angle_mid, h_ang, ns * MAX_ANGLES * sizeof(int),
+            cudaMemcpyHostToDevice);
+
+        for ( int i=0 ; i<ns ; i++ )
+            for ( int j=0 ; j<MAX_ANGLES; j++ )
+                h_ang[i * MAX_ANGLES + j] = angle_end[i][j];
+        cudaMemcpy(d_angle_end, h_ang, ns*MAX_ANGLES * sizeof(int),
+            cudaMemcpyHostToDevice);     
+             
+    }// if (n_total_angles > 0)
+
+
+
 	// Copy grid information
 	cudaMemcpy(d_dx, dx, 3 * sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_Nx, Nx, 3 * sizeof(int), cudaMemcpyHostToDevice);

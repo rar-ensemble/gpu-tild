@@ -59,6 +59,8 @@ int main(int argc, char** argv)
 
 	dout.open("data.dat");
 	dout << "# step Upe Ubond ";
+	if ( n_total_angles > 0 )
+	    dout << "Angles " ;
 	if (Dim == 2)
 		dout << "Pxx Pyy Pxy ";
 	else if (Dim == 3)
@@ -203,8 +205,10 @@ int main(int argc, char** argv)
 
 
 	// Write resume frame and finish //
-	cuda_collect_x();
-	write_lammps_traj();
+    if (max_steps % log_freq != 0) {
+        cuda_collect_x();
+        write_lammps_traj();
+    }
 
 	main_t_out = int(time(0));
 	int dt = main_t_out - main_t_in;
@@ -236,13 +240,17 @@ int print_timestep() {
 	}
 
 	cout << " U/V: " << Upe / V << \
-		" Ubond: " << Ubond << \
-		" Pdiags: " << Ptens[0] << " " << Ptens[1] << " ";
+		" Ubond: " << Ubond ;
+	if ( n_total_angles > 0 )
+	    cout << " Uangle: " << Uangle ;
+	cout << " Pdiags: " << Ptens[0] << " " << Ptens[1] << " ";
 
 	if (Dim == 3)
 		cout << Ptens[2] << " ";
 
 	dout << step << " " << Upe << " " << Ubond << " ";
+	if ( n_total_angles > 0 ) 
+	    dout << Uangle << " " ;
 	for (int i = 0; i < n_P_comps; i++)
 		dout << Ptens[i] << " ";
 

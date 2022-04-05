@@ -270,31 +270,22 @@ NOTE: This should be used in conjunction with some kind of self-repulsion (e.g.,
 	Changes the input script from default \verb+input+. Is used in the command line argument not in the input script.
 
   \item
-    Dim [integer] 
+    angle [int] [string] [float]
     \\[8pt]
-    Sets the dimensionality of the system.
-
-  \item
-    Nx [integer]
+    Defines angle style to be used. First int: angle type. String: angle style, currently only ``wlc'' supported. Float: force constant. 
     \\
-    Ny [integer]
-    \\
-    Nz [integer]
-    \\[8pt]
-    Sets the grid points in the x-, y-, and z-directions
+    Only currently supported format is the WLC potential $u(\theta_{ijk} ) = k_\theta (1+\cos(\theta))$.
+
 
 
   \item
-    read$\_$data [string]
+    bond [integer bond type] [float prefactor] [float equilibrium bond separation]
     \\[8pt]
-    Name of the input configuration file, should be in roughly LAMMPS data file format.
-
-  \item
-    read$\_$resume [string]
-    \\[8pt]
-    Name of the resume file, assumed to be a lammpstrj frame format.
-
+    Parameters for the harmonic bond of the form $u(r_{ij}) = k (r_{ij}-r_0)^2$.
     
+
+
+
     
     \item
     binary$\_$freq [integer]
@@ -330,6 +321,24 @@ NOTE: This should be used in conjunction with some kind of self-repulsion (e.g.,
     \\[8pt]
     Sets diffusivity of beads of type A. Only used with GJF integrator
     
+  \item
+    Dim [integer] 
+    \\[8pt]
+    Sets the dimensionality of the system.
+
+
+	\item
+	extraforce [group] [style] [arguments]
+	\\[8pt]
+	Adds extra forces to the particles in specified group. Supported styles currently include:
+	\\[8pt]
+	langevin [float gamma]
+	\\
+	Adds Langevin noise and friction to the forces, would need to be used with velocity Verlet algorithm to give proper thermostating.
+	
+	midpush [float magnitude]
+	\\
+	Adds a force of given magnitude pushing molecules towards the center of the simulation box in the highest-dimension direction ($z$ in 3D, $y$ in 2D, etc). This is useful for creating macrophase separated systems with a particular species in the center of the box. The magnitude of the forces should generally be small.
     
     \item
     grid$\_$freq [integer]
@@ -360,36 +369,7 @@ NOTE: This should be used in conjunction with some kind of self-repulsion (e.g.,
 	\\[8pt]
 	Total number of time steps
     
-    
-    \item
-    rand$\_$seed [integer]
-    \\[8pt]
-    seed for the random number generator
-    
-    
-  \item
-    threads [integer]
-    \\[8pt]
-    Number of threads per GPU block to employ. Default is 512.
-    
-    
-    
 
-  \item
-    traj$\_$freq =[integer]
-    \\[8pt]
-    Frequency for writing to lammpstrj text file. Use sparingly.
-
-  \item
-    pmeorder [integer]
-    \\[8pt]
-    Should be an integer 1, 2, 3, or 4. Determines the order of the spline used to map particle densities to the grid.
-
-  \item
-    bond [integer bond type] [float prefactor] [float equilibrium bond separation]
-    \\[8pt]
-    Parameters for the harmonic bond of the form $u(r_{ij}) = k (r_{ij}-r_0)^2$.
-    
   \item
     n\_gaussians [integer]
     \\[8pt]
@@ -439,6 +419,55 @@ NOTE: This should be used in conjunction with some kind of self-repulsion (e.g.,
     For the phase: 0 = Lamellar, 1 = BCC (NOT YET IMPLEMENTED), 2 = CYL, 3 = GYR. Direction is the direction normal to lamellae, along the cylinders, and is ignore for GYR and BCC.
 
 	Employs the \verb+ramp+ keyword
+
+
+
+      \item
+    Nx [integer]
+    \\
+    Ny [integer]
+    \\
+    Nz [integer]
+    \\[8pt]
+    Sets the grid points in the x-, y-, and z-directions
+
+    
+  \item
+    pmeorder [integer]
+    \\[8pt]
+    Should be an integer 1, 2, 3, or 4. Determines the order of the spline used to map particle densities to the grid.
+
+
+    \item
+    rand$\_$seed [integer]
+    \\[8pt]
+    seed for the random number generator
+    
+      \item
+    read$\_$data [string]
+    \\[8pt]
+    Name of the input configuration file, should be in roughly LAMMPS data file format.
+
+  \item
+    read$\_$resume [string]
+    \\[8pt]
+    Name of the resume file, assumed to be a lammpstrj frame format.
+
+    
+  \item
+    threads [integer]
+    \\[8pt]
+    Number of threads per GPU block to employ. Default is 512.
+    
+    
+    
+
+  \item
+    traj$\_$freq =[integer]
+    \\[8pt]
+    Frequency for writing to lammpstrj text file. Use sparingly.
+
+
 \end{itemize}
 		%	else if (word == "n_gaussians") {
      % else if (word == "n_fieldphase") {
@@ -493,16 +522,13 @@ In addition to the variables that need to be defined, there are three places in 
 \pagebreak
 \section{Utilities}
 
-In the directory ``utils'', there are several .cpp files that can be used to post-process or generate initial configurations. 
+In the directory ``utils'', there are several files that can be used to post-process or generate initial configurations. 
 
-\subsection{utils/gen-configs}
-The configuration generation utilities are not well maintained and could stand to be made into python and more uniform, but for now:
-\\
-random\_config.cpp must be edited in source and can be used to generate configurations of diblocks.
 
-random\_blend.cpp must be edited in source and can generate binary blends.
+\subsection{utils/py-gen-conf/}
+This contains a bunch of python routines to generate configurations. It works for generic linear architectures by editing the header in either main.py or linear-polymers.py.
+While commented, these routines are not meant to be as easily plug-and-play as the main source code, but rather to serve as a starting point to make a configuration.
 
-diblock\_solvent.cpp must be edited in source, can create an AB diblock + a C solvent. 
 
 
 \subsection{utils/post-proc}
@@ -512,9 +538,17 @@ avg-grid-densities.cpp does not appear to actualy average as promised...
 
 calc\_sk/ subdirectory. Uses FFTW to calculate $S(k)$ from the binary files.
 
-dump\_particle\_posits.cpp is supposed to dump the binary particle positions into a lammpstrj file.
+dump\_particle\_posits.cpp dumps the binary particle positions into a lammpstrj file.
 
 
+\subsection{utils/gen-configs [deprecated]}
+The configuration generation utilities are not well maintained and could stand to be made into python and more uniform, but for now:
+\\
+random\_config.cpp must be edited in source and can be used to generate configurations of diblocks.
+
+random\_blend.cpp must be edited in source and can generate binary blends.
+
+diblock\_solvent.cpp must be edited in source, can create an AB diblock + a C solvent. 
 
 
 
@@ -530,16 +564,13 @@ In no particular order of priority or difficulty.
 	
 	
 	\item
-	Angle potentials. 	
+	Cosine harmonic angle potential
 
 	\item
 	LC interactions via Maier-Saupe potential
 	
 	\item
 	Rigid body dynamics, requires figuring out quaternions...
-	
-	\item
-	Constant $NV\gamma T$ ensemble to find domain spacing for L, C phases
 	
 	\item
 	DPD integrator

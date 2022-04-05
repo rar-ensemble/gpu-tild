@@ -153,10 +153,12 @@ void allocate_device_memory() {
 	cudaMalloc(&d_n_bonds, ns * sizeof(int));
 	cudaMalloc(&d_bonded_to, ns * MAX_BONDS * sizeof(int));
 	cudaMalloc(&d_bond_type, ns * MAX_BONDS * sizeof(int));
+	device_mem_use += sizeof(int) * (ns + ns * MAX_BONDS * 2 );
+
 	cudaMalloc(&d_bond_req, nbond_types * sizeof(float));
 	cudaMalloc(&d_bond_k, nbond_types * sizeof(float));
 
-	device_mem_use += sizeof(float) * (ns + ns * MAX_BONDS * 2 + 2 * nbond_types);
+    device_mem_use += sizeof(float) * nbond_types * 2;
 	
 	cudaMalloc(&d_bondE, ns * sizeof(float));
 	cudaMalloc(&d_bondVir, ns * n_P_comps * sizeof(float));
@@ -164,7 +166,17 @@ void allocate_device_memory() {
 	device_mem_use += ns * (n_P_comps + 1) * sizeof(float);
 
 	if (n_total_angles > 0) {
-		die("Angles not yet set up on device!");
+        cudaMalloc(&d_angle_k, nangle_types * sizeof(float));
+        cudaMalloc(&d_angle_theta_eq, nangle_types * sizeof(float));
+        device_mem_use += sizeof(float) * nangle_types * 2;
+
+        cudaMalloc(&d_n_angles, ns * sizeof(int));
+        cudaMalloc(&d_angle_first, ns * MAX_ANGLES * sizeof(int));
+        cudaMalloc(&d_angle_mid, ns * MAX_ANGLES * sizeof(int));
+        cudaMalloc(&d_angle_end, ns * MAX_ANGLES * sizeof(int));
+        cudaMalloc(&d_angle_type, ns * MAX_ANGLES * sizeof(int));
+        device_mem_use += ns * ( 1 + 4 * MAX_ANGLES ) * sizeof(int);
+		//die("Angles not yet set up on device!");
 	}
 
 	cudaMalloc(&d_Nx, 3 * sizeof(int));
@@ -301,6 +313,7 @@ void allocate_host_particles() {
 	partic_bondE = (float*)calloc(ns, sizeof(float));
 	partic_bondVir = (float*)calloc(ns * n_P_comps, sizeof(float));
 	bondVir = (float*)calloc(n_P_comps, sizeof(float));
+	angleVir = (float*)calloc(n_P_comps, sizeof(float));
 
 	tp = (int*)calloc(ns, sizeof(int));
 	molecID = (int*)calloc(ns, sizeof(int));

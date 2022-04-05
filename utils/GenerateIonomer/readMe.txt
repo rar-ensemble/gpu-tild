@@ -1,0 +1,1 @@
+This is a modified version of the polymer generation code to work with polymers. It can generate ionomers, dipoles, and uncharged polymer units. The code is intended to be called from generate_inputs for multiple systems created, or from generate_system for one system.

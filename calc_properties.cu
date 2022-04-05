@@ -8,9 +8,10 @@ __global__ void d_bondStressEnergy(int*, int*, int*, float*,
 
 void calc_nbEnergy(void);
 void calc_nbVirial(void);
-void calc_bondProps(void);
+void calc_bondedProps(void);
 void calc_electrostatic_energy_directly(void);
 void host_bonds(void);
+void host_angles(void);
 void cuda_collect_x(void);
 void cuda_collect_charge_density_field(void);
 void cuda_collect_electrostatic_potential(void);
@@ -38,7 +39,7 @@ void calc_properties() {
 
 
 	bond_t_in = int(time(0));
-	calc_bondProps();
+	calc_bondedProps();
 	bond_t_out = int(time(0));
 	bond_tot_time += bond_t_out - bond_t_in;
 
@@ -46,7 +47,7 @@ void calc_properties() {
 	//	<< ", " << bond_t_out << endl;
 }
 
-void calc_bondProps() {
+void calc_bondedProps() {
 
 	cuda_collect_x();
 	host_bonds();
@@ -55,6 +56,16 @@ void calc_bondProps() {
 	for (int i = 0; i < n_P_comps; i++) {
 		Ptens[i] += bondVir[i];
 	}
+
+
+
+	host_angles();
+
+	Upe += Uangle;
+	for (int i = 0; i < n_P_comps; i++) {
+		Ptens[i] += angleVir[i];
+	}
+
 	
 }
 

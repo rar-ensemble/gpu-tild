@@ -15,26 +15,28 @@ SRCS = array_utils.cu bonds.cu calc_properties.cu config_utils.cu cuda_random_po
 	pair_style_fieldphases.cu pair_style_gaussian.cu pbc_utils.cu read_input.cu \
 	pair_style_erf.cu reduce_utils.cu update_pairstyles.cu device_GJF_integrator.cu \
 	pair_style_charges.cu pair_style_gaussian_erf.cu group.cu integrator.cu \
-	nlist.cu Compute.cu
+	nlist.cu Compute.cu angles.cu device_angles.cu Extraforce.cu \
+	Extraforce_midpush.cu Extraforce_langevin.cu 
+
+OBJFOLDER := objects
+OBJS_MAKE = $(addprefix $(OBJFOLDER)/, ${OBJS})
 
 OBJS = $(SRCS:.cu=.o)
+
+$(OBJFOLDER)/%.o: %.cu
+	@mkdir -p $(dir $@)
+	${CC} -g ${CFLAGS} -c $< -o $@
+
    
 %.o: %.cu
 	$(CC) $(CFLAGS) -c $< -o $@
 	 
-gpu-tild: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
+gpu-tild: $(OBJS_MAKE)
+	$(CC) $(CFLAGS) -o $@ $(OBJS_MAKE) $(LIBS)
 
-#OBJS = $(SRCS:.cu=.o)
-#
-#.cu.o: .cu
-#	${CC} ${CFLAGS} -c  $<
-#
-#gpu-tild:  ${OBJS}
-#	$(CC) ${CFLAGS} -o $@ ${OBJS} $(LIBS)
 
 clean:
-	rm -f *.o
+	rm -fr *.o objects
 	rm -f gpu-tild
 	rm -f *~
 

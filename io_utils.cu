@@ -139,7 +139,7 @@ void write_struc_fac() {
     int i, j, k, nn[3];
     float kv[3], k2;
     double temp;
-    char label [20];
+    char label [30];
     
     for (i = 0; i < ntypes; i++) {
         // Open output file

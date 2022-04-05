@@ -195,7 +195,12 @@ __global__ void d_prepareChargeDensity(float* d_t_charge_density,
 	d_tc[ind].y = 0.f;
 }
 
-//calculates electrostatic potential
+
+//calculates electrostatic potential in Fourier space
+// d_tc:         [M] Fourier transform of density field
+// d_ep:         [M] variable to store electrostatic potential
+// bjerrum:      Bjerrum length
+// length_scale: charge smearing length
 __global__ void d_prepareElectrostaticPotential(cufftComplex* d_tc, cufftComplex* d_ep, 
 	float bjerrum, float length_scale, const int M, const int Dim, const float* L,
 	const int* Nx) {
@@ -210,8 +215,8 @@ __global__ void d_prepareElectrostaticPotential(cufftComplex* d_tc, cufftComplex
 
 	if (k2 != 0) {
 		//d_ep[ind].x = ((d_tc[ind].x * 4 * PI * bjerrum) / k2) * exp(-1 * k2 / (2 * length_scale * length_scale));
-		d_ep[ind].x = ((d_tc[ind].x * 4 * PI * bjerrum) / k2) * exp(-1 * k2 / (2 * length_scale * length_scale));
-		d_ep[ind].y = ((d_tc[ind].y * 4 * PI * bjerrum) / k2) * exp(-1 * k2 / (2 * length_scale * length_scale));
+		d_ep[ind].x = ((d_tc[ind].x * 4 * PI * bjerrum) / k2) * exp( -k2 * length_scale * length_scale / 2.0);
+		d_ep[ind].y = ((d_tc[ind].y * 4 * PI * bjerrum) / k2) * exp( -k2 * length_scale * length_scale / 2.0);
 	}
 	else {
 		d_ep[ind].x = 0.f;
@@ -234,8 +239,8 @@ __global__ void d_prepareElectricField(cufftComplex* d_ef, cufftComplex* d_ep,
 	float k[3], k2;
 	k2 = d_get_k(ind, k, L, Nx, Dim);
 
-	d_ef[ind].x = k[dir] * d_ep[ind].y * exp(-1 * k2 / (2 * length_scale * length_scale));
-	d_ef[ind].y = -k[dir] * d_ep[ind].x * exp(-1 * k2 / (2 * length_scale * length_scale));
+	d_ef[ind].x = k[dir] * d_ep[ind].y * exp(-k2 * length_scale * length_scale /2.0);
+	d_ef[ind].y = -k[dir] * d_ep[ind].x * exp( -k2 * length_scale * length_scale / 2.0);
 	//d_ef[ind].x = k[dir] * d_ep[ind].x * exp(-1 * k2 / (2 * length_scale * length_scale));
 	//d_ef[ind].y = 0.f;
 }
@@ -343,8 +348,8 @@ __global__ void d_kSpaceMakeForce(cufftComplex* u_k, cufftComplex* f_k,
 	if (ind >= M)
 		return;
 
-	float kv[3], k2;
-	k2 = d_get_k(ind, kv, L, Nx, Dim);
+	float kv[3];
+	(void)d_get_k(ind, kv, L, Nx, Dim);
 
 	f_k[ind * Dim + 0].x = -kv[0] * u_k[ind].y;
 	f_k[ind * Dim + 0].y = -kv[0] * u_k[ind].x;
@@ -461,7 +466,7 @@ __global__ void d_initVirial(float* vr, const float* fr,
 	if (ind >= M)
 		return;
 
-	float ro[3], ri[3], dr2, dr[3];
+	float ro[3], ri[3], dr[3];
 
 	for (int j = 0; j < Dim; j++) {
 		ro[j] = 0.f;
@@ -469,7 +474,7 @@ __global__ void d_initVirial(float* vr, const float* fr,
 
 	d_get_r(ind, ri, Nx, dx, Dim);
 
-	dr2 = d_pbc_mdr2(ri, ro, dr, dL, Lh, Dim);
+	(void)d_pbc_mdr2(ri, ro, dr, dL, Lh, Dim);
 
 	for (int j = 0; j < Dim; j++) {
 		// Whether Dim == 2 or 3, this provides the diagonal component

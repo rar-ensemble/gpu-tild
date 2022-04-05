@@ -51,7 +51,7 @@ void Erf::Initialize_Erf(float Ao, float sigma2, float Rp,
 		k = sqrt(k2);
 
 		if (k2 == 0) {
-			this->u_k[i] = Ao *// prefactor
+			this->u_k[i] = Ao * // prefactor
 				// exp(-k2 * sigma2 * 0.5f) * //Gaussian contribution = 1
 				PI4 * Rp * Rp * Rp / 3 *   // step function contribution for 1
 				PI4 * Rp * Rp * Rp / 3;   // step function contribution for 2
@@ -61,7 +61,7 @@ void Erf::Initialize_Erf(float Ao, float sigma2, float Rp,
 			//FFT of step function 
 			temp = PI4 * (sin(Rp * k) - Rp * k * cos(Rp * k)) / (k2 * k);
 
-			this->u_k[i] = Ao *// prefactor
+			this->u_k[i] = Ao * // prefactor
 				exp(-k2 * sigma2 * 0.5f) * //Gaussian contribution of both
 				temp * // step function for 1
 				temp; // step function for the other

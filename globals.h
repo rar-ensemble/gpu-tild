@@ -14,6 +14,7 @@
 #include "integrator.h"
 #include "nlist.h"
 #include "Compute.h"
+#include "Extraforce.h"
 
 #include <curand.h>
 #include <curand_kernel.h>
@@ -23,8 +24,6 @@
 
 using namespace std;
 
-#define MAX_BONDS 3
-#define MAX_ANGLES 3
 
 #define PI 3.141592654f
 #define PI2 6.2831853071f
@@ -49,18 +48,18 @@ traj_freq, log_freq, struc_freq, skip_steps, mem_use, device_mem_use, RAND_SEED,
 Nx[3], pmeorder, M, grid_per_partic, bin_freq,
 n_total_bonds, n_total_angles, nbond_types, nangle_types,
 * n_bonds, * n_angles, ** bonded_to, ** bond_type,
-* d_n_bonds, * d_n_angles, * d_bonded_to, * d_bond_type,
 ** angle_first, ** angle_mid, ** angle_end, ** angle_type,
 n_gaussian_pairstyles, ** gaussian_types,
 n_fieldphase_pairstyles, ** fieldphase_types, * fieldphase_dir,
 * fieldphase_phase, * fieldphase_n_periods, threads, n_P_comps,
-n_erf_pairstyles, ** erf_types, 
+n_erf_pairstyles, ** erf_types, MAX_BONDS, MAX_ANGLES,
 n_groups,           // Total number of group definitions.
 n_integrators,      // total number of integrators
 using_GJF,          // Flag to know to allocate GJF memory
 n_neighbor_lists,   // Total number of neighbor lists allocated
 allocate_velocities,// Flag to allocate particle velocities
 n_computes,         // Total number of computes
+n_extra_forces,     // Number of ''extraforce'' routines
 do_charges;
 
 #ifndef MAIN
@@ -69,7 +68,7 @@ extern
 float L[3], Lh[3], V, ** x, ** xo, ** f, ** v, * mass, * Diff, * h_ns_float,
 delt, * bond_k, * bond_req, Ubond, * angle_k, * angle_theta_eq, Uangle,
 dx[3], * tmp, * tmp2, * all_rho, gvol, noise_mag,
-Upe, * Ptens, * partic_bondE, * partic_bondVir, * bondVir,
+Upe, * Ptens, * partic_bondE, * partic_bondVir, * bondVir, *angleVir,
 * gaussian_prefactor, * gaussian_sigma, * U_gaussian,
 * gaussian_final_prefactor,
 * fieldphase_prefactor, * U_fieldphase,
@@ -100,7 +99,8 @@ float* d_x, * d_v, * d_f, * d_L, * d_Lh,
 * d_all_fx_charges, * d_all_fy_charges, * d_all_fz_charges,
 * d_bondE, * d_bondVir,
 * d_xo, * d_prev_noise, * d_mass, * d_Diff,
-* d_charges, * d_charge_density_field, * d_electrostatic_potential, * d_electric_field;
+* d_charges, * d_charge_density_field, * d_electrostatic_potential, * d_electric_field,
+* d_angle_k, * d_angle_theta_eq ;
 
 #ifndef MAIN
 extern
@@ -121,7 +121,9 @@ cufftHandle fftplan;
 extern
 #endif
 int d_ns, * d_typ, * d_Nx, ns_Block, ns_Grid, M_Block, M_Grid,
-* d_grid_inds;
+* d_grid_inds,
+* d_n_bonds, * d_n_angles, * d_bonded_to, * d_bond_type,
+* d_angle_first, * d_angle_mid, * d_angle_end, *d_angle_type ;
 
 #ifndef MAIN
 extern
@@ -147,6 +149,11 @@ vector<FieldPhase> Fields;
 extern
 #endif
 vector<Erf> Erfs;
+
+#ifndef MAIN
+extern
+#endif
+vector<ExtraForce> ExtraForces;
 
 #ifndef MAIN
 extern

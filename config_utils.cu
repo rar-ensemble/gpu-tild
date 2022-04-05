@@ -395,12 +395,71 @@ void write_lammps_traj() {
 			fprintf(otp, " %f", charges[i]);
 
 		fprintf(otp, "\n");
-
 	}
-
 	fclose(otp);
-
 }
+
+/*
+void write_conf_file() {
+    FILE* otp;
+    int i, j;
+    otp = fopen(final_conf_name.c_str(), "w");
+
+    fprintf(otp, "GPU TILD\n\n");
+    
+    fprintf(otp, "%d atoms\n", ns);
+    fprintf(otp, "%d bonds\n", n_total_bonds);
+    fprintf(otp, "%d angles\n", n_total_angles);
+    fprintf(otp, "\n");
+
+    fprintf(otp, "%d atom types\n", ntypes);
+    fprintf(otp, "%d bond types\n", nbond_types);
+    fprintf(otp, "%d angle types\n", nangle_types);
+    fprintf(otp, "\n");
+
+
+    fprintf(otp, "0 %f xlo xhi\n",L[0]);
+    fprintf(otp, "0 %f ylo yhi\n",L[1]);
+    fprintf(otp, "0 %f zlo zhi\n",L[2]);
+
+    fprintf(otp, "\n");
+
+    fprintf(otp, "Masses\n\n");
+
+	for (i = 0; i < ntypes; i++) {
+        fprintf(otp, "%d %f\n");
+    }
+    fprintf(otp, "\n");
+
+    fprintf(otp, "Atoms \n\n");
+
+	for (i = 0; i < ns; i++) {
+		fprintf(otp, "%d %d %d  ", i + 1, tp[i] + 1, molecID[i] + 1);
+		for (j = 0; j < Dim; j++)
+			fprintf(otp, "%f ", x[i][j]);
+
+		if ( do_charges )
+			fprintf(otp, "%f", charges[i]);
+
+		for (j = Dim; j < 3; j++)
+			fprintf(otp, " %f", 0.f);
+
+		fprintf(otp, "\n");
+	}
+    fprintf(otp, "\n");
+
+    if (n_total_bonds){
+        fprintf(otp, "Bonds \n\n");
+        int i = 0;
+        for (int i1 = 0; 
+        for (i = 0; i < n_total_bonds; i++) {
+            fprintf(otp, "%d %d %d %d", i, 
+            
+        }
+    }
+}
+
+*/
 
 void read_resume( const char *nm ) {
 

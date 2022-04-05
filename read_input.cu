@@ -15,6 +15,11 @@ void read_input() {
 
 	if (input_file.length() == 0) input_file = "input";
 	ifstream in2(input_file);
+	if (not in2.is_open()){
+		cout << "File " << input_file << " does not exist."<<endl;
+		die("");
+	}
+
 	string word, line, rname;
 	int config_read_flag = 0, read_resume_flag = 0; 
 	int read_charge_flag = 0;
@@ -31,7 +36,27 @@ void read_input() {
 		// Loop over words in line
 		while (iss >> word) {
 
-			if (word == "binary_freq") {
+            if ( word == "angle" ) {
+                if ( !config_read_flag ) 
+                    die("Error in input file, angle keyword before config read!");
+                else if (nangle_types == 0 )
+                    die("angle keyword found, but no angle types in config file!");
+                
+                string toint, tofloat, aform;
+                iss >> toint ;
+                int atype = stoi(toint);
+                if ( atype > nangle_types ) 
+                    die("Invalid angle type in input file!");
+                
+                iss >> aform;
+                if ( aform != "wlc" )
+                    die("You fool, that angle type is not supported!");
+
+                iss >> tofloat;
+                angle_k[atype-1] = stof(tofloat);
+			}
+
+			else if (word == "binary_freq") {
 				string toint;
 				iss >> toint;
 				bin_freq = stoi(toint);
@@ -78,6 +103,8 @@ void read_input() {
 
 
 			else if (word == "compute") {
+				if (!config_read_flag)
+					die("Error in input file, compute defined before config read");
 				n_computes += 1;
 				Computes.resize(n_computes);
 				Computes[n_computes - 1].Initialize(line);
@@ -115,6 +142,15 @@ void read_input() {
 				iss >> toint;
 				Dim = stoi(toint);
 			}
+			
+            else if (word == "extraforce") {
+                        n_extra_forces++;
+                        ExtraForces.resize(n_extra_forces);
+                        ExtraForces[n_extra_forces - 1].Initialize(line);
+
+                        while (iss >> word) {};// Loop over rest of the line
+            }
+
 			else if (word == "grid_freq") {
 				string toint;
 				iss >> toint;
@@ -166,6 +202,20 @@ void read_input() {
 				iss >> toint;
 				log_freq = stoi(toint);
 			}
+
+			
+			else if (word == "MAX_ANGLES") {
+				string toint;
+				iss >> toint;
+				MAX_ANGLES = stoi(toint);
+			}
+
+			else if (word == "MAX_BONDS") {
+				string toint;
+				iss >> toint;
+				MAX_BONDS = stoi(toint);
+			}
+			
 			else if (word == "max_steps") {
 				string toint;
 				iss >> toint;
@@ -225,7 +275,7 @@ void read_input() {
 								<< " to " << Iter.final_prefactor << endl;
 
 							cout << "Estimated per time step change: " << \
-								(Iter.initial_prefactor - Iter.final_prefactor) / max_steps
+								(Iter.final_prefactor - Iter.initial_prefactor) / max_steps
 								<< endl;
 
 						}
@@ -288,7 +338,7 @@ void read_input() {
 								<< " to " << Iter.final_prefactor << endl;
 
 							cout << "Estimated per time step change: " << \
-								(Iter.initial_prefactor - Iter.final_prefactor) / max_steps
+								(Iter.final_prefactor - Iter.initial_prefactor) / max_steps
 								<< endl;
 
 						}
@@ -346,7 +396,7 @@ void read_input() {
 								<< " to " << Iter.final_prefactor << endl;
 
 							cout << "Estimated per time step change: " << \
-								(Iter.initial_prefactor - Iter.final_prefactor) / max_steps
+								(Iter.final_prefactor - Iter.initial_prefactor) / max_steps
 								<< endl;
 
 						}
@@ -406,7 +456,7 @@ void read_input() {
 								<< " to " << Iter.final_prefactor << endl;
 
 							cout << "Estimated per time step change: " << \
-								(Iter.initial_prefactor - Iter.final_prefactor) / max_steps
+								(Iter.final_prefactor - Iter.initial_prefactor) / max_steps
 								<< endl;
 
 						}
@@ -545,10 +595,13 @@ void set_defaults() {
 	threads = 512;
 	noise_mag = sqrtf(2.0f * delt);
 	n_groups = 1;
-  n_integrators = 0;
+    n_integrators = 0;
 	n_computes = 0;
+    n_extra_forces = 0;
 	using_GJF = 0;
-  do_charges = 0;
+    do_charges = 0;
+	MAX_BONDS = 3;
+	MAX_ANGLES = 3;
 
 	max_steps = 100000;
 	RAND_SEED = int(time(0));
@@ -588,6 +641,8 @@ void write_runtime_parameters(int rflag, string rname) {
 		if (rflag)
 			otp << "read_resume " << rname << endl;
 		otp << "max_steps " << max_steps << endl;
+		otp << "MAX_BONDS " << MAX_BONDS << endl;
+		otp << "MAX_ANGLES " << MAX_ANGLES << endl;
 		otp << "log_freq " << log_freq << endl;
 		otp << "threads " << threads << endl;
 		otp << "grid_freq " << grid_freq << endl;
@@ -609,7 +664,7 @@ void write_runtime_parameters(int rflag, string rname) {
 			for (Gaussian& Iter : Gausses) {
 				otp << "gaussian" << Iter.type1 + 1 << " " \
 					<< Iter.type2 + 1 << " " << Iter.initial_prefactor \
-					<< " " << Iter.sigma_squared<< endl;
+					<< " " << sqrt(Iter.sigma_squared) << endl;
 			}
 
 		}
@@ -628,7 +683,7 @@ void write_runtime_parameters(int rflag, string rname) {
 			otp << "n_erfs " << Erfs.size() << endl;
 			for (Erf& Iter : Erfs) {
 				otp << "erf " << Iter.type1 + 1 << " " << Iter.type2 + 1 << " " \
-					<< Iter.initial_prefactor << " " << Iter.Rp << " " << Iter.sigma_squared << endl;
+					<< Iter.initial_prefactor << " " << Iter.Rp << " " << sqrt(Iter.sigma_squared)  << endl;
 			}
 		otp << endl;
 		}
@@ -637,10 +692,14 @@ void write_runtime_parameters(int rflag, string rname) {
 			otp << "n_gaussian_erfs " << GaussErfs.size() << endl;
 			for (GaussianErf& Iter : GaussErfs) {
 				otp << "erf " << Iter.type1 + 1 << " " << Iter.type2 + 1 << " " \
-					<< Iter.initial_prefactor << " " << Iter.Rp << " " << Iter.sigma_squared << endl;
+					<< Iter.initial_prefactor << " " << Iter.Rp << " " << sqrt(Iter.sigma_squared) << endl;
 			}
 			otp << endl;
 		}
+
+        for ( int i=0 ; i<n_extra_forces ; i++ ) {
+            otp << ExtraForces.at(i).PrintCommand() << endl;
+        }
 
 		for (int i = 0; i < n_computes; i++)
 			otp << Computes.at(i).input_command << endl;

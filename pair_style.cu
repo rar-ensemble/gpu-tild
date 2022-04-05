@@ -312,7 +312,7 @@ void PairStyle::Update() {
     // precision errors if chi is adjusted slowly over the course
     // of a long simulation. It cancels since the ratio is passed
     // as the argument
-    float delta_A = (1000.0f * (initial_prefactor - final_prefactor)) / float(max_steps);
+    float delta_A = (1000.0f * (final_prefactor - initial_prefactor)) / float(max_steps);
     float cur_A = 1000.0f * initial_prefactor + delta_A * float(step);
     float new_A = cur_A + delta_A;
 

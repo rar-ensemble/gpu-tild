@@ -5,6 +5,10 @@ __global__ void d_zero_all_ntyp(float*, int, int);
 __global__ void d_zero_all_directions_charges(float*, int);
 __global__ void d_bonds(int*, int*, int*, float*,
 	float*, float*, float*, float*, float*, int, int, int);
+__global__ void d_angles(const float*, float*, const float*,
+    const float*, const int*, const int*, const int*, const int*,
+    const int*, const float*, const float*, const int, const int,
+    const int);
 
 __global__ void d_prep_components(float*, float*, float*,
 	const int, const int, const int);
@@ -183,14 +187,22 @@ void forces() {
 		d_bonds<<<ns_Grid, ns_Block>>>(d_n_bonds, d_bonded_to,
 			d_bond_type, d_bond_req, d_bond_k, d_x, d_f,
 			d_L, d_Lh, ns, MAX_BONDS, Dim);
+
+    check_cudaError("bond forces");
 	}
 
-	cudaReturn = cudaGetLastError();
-	if (cudaReturn != cudaSuccess) {
-		char cherror[90];
-		sprintf(cherror, "Cuda failed with error \"%s\" while d_bonds ran\n", cudaGetErrorString(cudaReturn));
-		die(cherror);
-	}
+    if ( n_total_angles > 0 ) {
+        d_angles<<<ns_Grid, ns_Block>>>(d_x, d_f, d_angle_k,
+            d_angle_theta_eq, d_n_angles, d_angle_type,
+            d_angle_first,d_angle_mid, d_angle_end, d_L, d_Lh,
+            ns, MAX_ANGLES, Dim);
+        
+        check_cudaError("angle forces");
+    }
+
+    for ( int i=0 ; i<n_extra_forces ; i++ ) 
+      ExtraForces[i].AddExtraForce();
+
 
 
 }
